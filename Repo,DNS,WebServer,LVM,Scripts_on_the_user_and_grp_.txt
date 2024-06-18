@@ -1,0 +1,372 @@
+1. Repository 
+==============
+#setup // configure the static ip for the local pc 40.40.40.2
+#ifup eth0
+#ifconfig
+#mkdir /exam
+#cd /media/RHEL...../Packages/
+#cp * -v /exam/
+#cd /exam/
+#rpm -ivh delta[tab_key]
+#rpm -ivh python-delta[tab_key]
+#rpm -ivh createrepo[tab_key]
+#createrepo -v /exam/
+#cd /etc/yum.repos.d/
+#vim riste.repo
+	[server]
+	name = Linux Server
+	baseurl=file:///exam
+	enabled=1
+	gpgcheck=0
+#yum repolist  
+-#yum install dhcp –y
+   
+
+   -#cp  /usr/share/doc/dhcp-4.1.1/dhcpd.conf.sample   /etc/dhcp/dhcpd.conf
+   -#type "y"
+
+   -#vim /etc/dhcp/dhcpd.conf
+	:47 
+	go to line 47 to the edit
+	tap "i" to insert
+	"Example let say we have been given this ip:40.40.40.0/28"
+	you will edit like this first on subnet put "network id"
+	
+	//let say you have given the static ip 40.40.40.2 in this case
+	the dhcp will start from 40.40.40.3 and above according to the range//
+	Subnet 40.40.40.0 netmask 255.255.255.240;
+	iprange 40.40.40.3  40.40.40.16
+	domain you delete the given domain and put ex: auca.rw
+	domain thing put where there the "delete those internrt.org put your domain ex:auca.rw"
+	ip router 40.40.40.1
+	erase the line of ip broadcast-domain
+	Default-lease-time:28800
+	Max-lease-time:43200
+
+	:wq(quit and save)
+
+  -#service dhcpd start
+
+	in case you have Ok that good continue 
+	in case you have Failed don't panic 
+	#-dhcpd –t this will show where is the error
+	#vim /etc/dhcp/dhcpd.conf (back and correct the error) after
+	#service dhcpd start(check if it ok this time) after
+   -#chkconfig dhcpd on
+
+			the side of client 
+			----------------------
+	First open Terminals
+
+#su(type this command) 
+After enter the password of root
+///first check if both Root VM and Client VM the both use one network cable 
+let say you put on Bridge Adapter on Both side///
+
+#Turn on the system eth0/0 on both side root and client 
+#service network restart 
+#ifconfig
+#ping 40.40.40.2
+
+2. sub-interfaces
+=================
+#setup // configure the static ip for the local pc 40.40.40.2
+#ifup eth0
+#ifconfig
+#cd /etc/sysconfig/network-scripts/
+#vim ifcfg-eth0
+	ONBOOT=yes
+#cp ifcfg-eth0 ifcfg-eth0:1
+#vim ifcfg-eth0:1
+	DEVICE=eth0:1
+	IPADDR=10.10.10.2
+	NETMASK=255.255.255.248
+	GATEWAY=10.10.10.1
+
+
+#service network restart
+#service NetworkManager stop
+#service network restart
+#service NetworkManager start
+#ifconfig
+
+3. DNS
+======
+#yum install bind* -y
+#vim /etc/named.conf 
+	:se nu
+	line11 {127.0.0.1; 192.168.10.5; 10.10.10.2;};
+	line17 {localhost; 192.168.10.0/24; 10.10.100.0/28;}; (press enter)
+	allow-transfer {localhost; 192.168.10.6;};  (write this word)
+
+#vim /etc/named.rfc1912.zones 
+	//copy// zone "localhost" IN {
+			type master;
+			file "named.localhost";
+			allow-update { none; };
+               };
+ 
+	//copy// zone "1.0.0.127.in-addr.arpa" IN {
+			type master;
+			file "named.localhost";
+			allow-update { none; };
+               };
+ 
+
+
+	zone "auca.com" IN {
+			type master;
+			file "foward.zone";
+			allow-update { none; };
+               };
+
+	zone "40.40.40.in-addr.arpa" IN {
+			type master;
+			file "reverse.zone";
+			allow-update { none; };
+               };
+ 
+
+	zone "10.10.10.in-addr.arpa" IN {
+			type master;
+			file "reverse.zone";
+			allow-update { none; };
+               };
+
+
+
+#cd /var/named/
+#cp named.localhost forward.zone
+#cp named.localhost reverse.zone
+#vim forward.zone
+	
+	@ root.auca.com. (
+		           123456789	;serial
+@	IN	NS	server.auca.com.
+@	IN	A	40.40.40.2
+server	IN	A	40.40.40.2
+:wq
+	
+#vim reverse.zone
+	
+	server.auca.com  root.auca.com. (
+				123445678		;serial
+@	IN	NS	server.auca.com.
+@	IN	PTR	auca.com.
+server	IN	A	40.40.40.2
+2	IN	PTR	server.auca.com.
+#chgrp named forward.zone
+#chgrp named reverse.zone
+#named-checkconf /etc/named.conf 
+#named-checkzone auca.com /var/named/forward.zone [output here must be OK]
+#named-checkzone auca.com /var/named/reverse.zone	[output here must be OK]
+#restorecon /etc/named.conf
+#vim /etc/resolv.conf
+search auca.com
+nameserver 40.40.40.2
+:wq
+#service named restart
+#nslookup 192.168.10.5
+#nslookup server.auca.com
+#dig server.auca.com  [this is how we check our DNS]
+
+4. WEB-SERVER
+=============
+#yum install httpd* -y
+#cd /var/www/
+#mkdir web1 web2 
+#vim /var/www/web1/index.html
+	echo"here we are at mtn webpage"
+#vim /var/www/web2/index.html
+	echo"here we are at airtel webpage"
+-after save
+#vim /etc/httpd/conf/httpd.conf 
+	:990
+	    NameVirtualHost 40.40.40.2:80;
+	    NameVirtualHost 10.10.10.2:80;
+
+#cd /etc/httpd/conf.d/
+#cp welcome.conf  www.conf 
+#vim www.conf
+	
+		
+	<VirtualHost 40.40.40.2:80>
+		ServerName	www.mtn.com
+		DocumentRoot	/var/www/web1
+		<Directory	"/var/www/web1">
+			order allow,deny
+			allow from all
+		</Directory>
+	</VirtualHost>
+
+	<VirtualHost 10.10.10.2:80>
+		ServerName	www.airtel.com
+		DocumentRoot	/var/www/web2
+		<Directory	"/var/www/web2">
+			order allow,deny
+			allow from all
+		</Directory>
+	</VirtualHost>
+:wq
+#vim /var/named/forward.zone
+
+	@ root.auca.com. (
+		           123456789	;serial
+@	IN	NS	server.auca.com.
+@	IN	A	40.40.40.2
+server	IN	A	40.40.40.2
+www.mtn.com	IN	A	40.40.40.2
+www.airtel.com	IN	A	10.10.10.2	
+:wq
+ 
+#vim /var/named/reverse.zone
+ 
+	server.auca.com root.auca.com. (
+				123445678		;serial
+@	IN	NS	server.auca.com.
+@	IN	PTR	auca.com.
+server	IN	A	40.40.40.2
+2	IN	PTR	server.auca.com.
+2	IN	PTR	www.mtn.com.
+2	IN	PTR	www.airtel.com.
+:wq
+
+#service named restart
+#service httpd restart
+#vim /etc/hosts
+	// 127.0.0.1         after write auca.com
+	// ::1 	        below write
+
+	40.40.40.2	www.mtn.com
+	10.10.10.2	www.airtel.com
+	
+#curl 40.40.40.2
+here we are at mtn webpage [this must be the output]
+#curl www.mtn.com
+here we are at mtn webpage [this must be the output]
+
+
+			----LVM----
+			==========
+
+
+
+1. fdisk -l => Display info about partitions
+    
+    n: create new partition
+        e:extends
+        p:Primary partition(1-4)
+        l:logical partitions
+        t: used to change  partition type
+
+1.CREATE PARTITIONS
+  =================
+#create 2
+/dev/sda3  5000M
+/dev/sda4  5000M
+ 
+a.  creating phyisical partitions
+
+    1. fdisk /dev/sda
+    2. n
+    3. e
+    4.#partition number: 3
+    5.#default cylinders :enter
+    6.#default cylinders :enter 
+    7.n
+    8.l
+    9.#first cylinder: enter
+    10.#last cylinder: +5000M
+    13.#Change partition type to Linux LVM
+         t
+         5
+         8e
+   14 W
+   15 partprobe
+   16 init 6
+
+b. create physical volume
+==========================
+   #fdisk -l  
+   #pvcreate  /dev/sda5  /dev/sda6     [for me i have sda5 and sda6 as partion]
+   #pvdisplay
+
+C. create group volume
+=======================
+    #vgcreate /dev/vg0  /dev/sda5  /dev/sda6  /dev/sda7
+
+    #vgdisplay
+
+D. Create logical volume lv1, lv2
+==================================
+    lvcreate -L  200M -n  /dev/vg0/lv1
+    lvcreate -L  200M -n  /dev/vg0/lv2
+
+#lvdisplay
+
+E. Extending
+===========
+lvextend  -L +100M   /dev/vg0/lv1
+resize2fs  /dev/vg0/lv1
+   
+#forcing just in case resize doesn't work 
+{e2fsck -f /dev/vg0/lv1} and then do the {resize2fs  /dev/vg0/lv1}   
+
+F. Reducing
+=========
+first unmount => umount /dev/vg0/lv1
+                 e2fsck -f /dev/vg0/lv1
+                resize2fs  /dev/vg0/lv1  200M
+                lvreduce -L -100M /dev/vg0/lv1 
+
+G. Removing
+==========
+lvremove /dev/vg1/lv1
+vgremove vg0
+pvremove  /dev/sda5
+
+H. #Mount
+========
+mkdir /myData
+
+mount /dev/vg0/lv1  /myData
+cd /myData
+date >> date.txt
+cal 2022 >> file2022.txt
+cat date.txt
+cat file2022.txt
+
+I. #UnMount
+==========
+umount /dev/vg0/lv1
+
+
+                  Creating user and group
+	-----------------------
+#useradd (put the name ex: Linux)
+#groupadd (put the name ex: Project)
+
+check how many user in the system
+---------------------------------
+#cat /etc/passwd to see privileges too  or
+#system-config-users 
+
+check how many groups in the system
+-----------------------------------
+#cat /etc/group
+
+to change group of a user
+-------------------------
+#usermod -a -G group1 user1
+
+changing ownership of a group
+-----------------------------
+#chown username:group1 /staffdata
+
+use following command to change permission
+----------------------------------------------
+#chmod 770 /staffdata
+
+how to make user change his passwd at logon
+-------------------------------------------
+#chage -d 0 user2
